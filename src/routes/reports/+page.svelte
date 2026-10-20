@@ -16,6 +16,12 @@
     ['PASSED', 'Đạt'],
     ['FAILED', 'Không đạt']
   ];
+  const completionStates = [
+    ['', 'Tất cả'],
+    ['COMPLETED', 'Đã hoàn thành'],
+    ['INCOMPLETE', 'Chưa hoàn thành'],
+    ['OVERDUE', 'Quá hạn']
+  ];
   const labels: Record<string, string> = {
     TEAM: 'Nhóm',
     DIRECT: 'Trực tiếp',
@@ -55,7 +61,14 @@
       ></label
     >
     <label
-      >Trạng thái<select name="status" multiple size="3"
+      >Tiến độ<select name="completion" value={data.filters.completion}
+        >{#each completionStates as [value, label]}<option
+            {value}>{label}</option
+          >{/each}</select
+      ></label
+    >
+    <label
+      >Trạng thái chi tiết<select name="status" multiple size="3"
         >{#each statuses as [value, label]}<option
             {value}
             selected={data.filters.statuses.includes(value)}>{label}</option
@@ -106,6 +119,7 @@
         <input type="hidden" name="to" value={data.filters.to} />
         <input type="hidden" name="type" value={data.filters.type} />
         <input type="hidden" name="user" value={data.filters.user} />
+        <input type="hidden" name="completion" value={data.filters.completion} />
         <input type="hidden" name="scope" value="tasks" />
         {#each data.filters.statuses as status}<input
             type="hidden"
@@ -124,18 +138,19 @@
         <table>
           <thead
             ><tr
-              ><th>Mã</th><th>Công việc</th><th>Loại</th><th>Trạng thái</th><th
-                >Người đề xuất</th
-              ><th>Chủ trì</th><th>Hạn</th><th>Tiến độ</th><th>Đánh giá</th></tr
+              ><th>Tên công việc</th><th>Loại công việc</th><th>Trạng thái công việc</th
+              ><th>Chủ trì</th><th>Hạn hoàn thành</th><th>Khối lượng được giao</th
+              ><th>Khối lượng đã thực hiện</th><th>Tiến độ</th><th>Đánh giá</th></tr
             ></thead
           ><tbody>
             {#each data.tasks as task (task.id)}<tr
-                ><td><a href={`/tasks/${task.id}`}>#{task.id}</a></td><td
-                  class="title">{task.title}</td
+                ><td><a href={`/tasks/${task.id}`}>{task.title}</a></td
                 ><td>{labels[task.task_type]}</td><td
                   ><span class="status">{labels[task.status]}</span></td
-                ><td>{task.proposer_name}</td><td>{task.lead_name ?? '—'}</td
-                ><td class:late={task.overdue}>{task.deadline}</td><td
+                ><td>{task.lead_name ?? '—'}</td
+                ><td class:late={task.overdue}>{task.deadline}</td
+                ><td>{task.assigned_quantity ?? '—'}</td
+                ><td>{task.done_quantity ?? '—'}</td><td
                   >{task.avg_progress === null
                     ? '—'
                     : `${Math.round(task.avg_progress)}%`}</td
@@ -158,6 +173,7 @@
         <input type="hidden" name="to" value={data.filters.to} />
         <input type="hidden" name="type" value={data.filters.type} />
         <input type="hidden" name="user" value={data.filters.user} />
+        <input type="hidden" name="completion" value={data.filters.completion} />
         <input type="hidden" name="scope" value="people" />
         {#each data.filters.statuses as status}<input
             type="hidden"

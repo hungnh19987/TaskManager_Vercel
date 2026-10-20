@@ -10,7 +10,10 @@ const parseFilters = (url: URL): ReportFilters => ({
   dateTo: url.searchParams.get('to') || undefined,
   statuses: url.searchParams.getAll('status') as TaskStatus[],
   taskType: (url.searchParams.get('type') || undefined) as TaskType | undefined,
-  userId: url.searchParams.get('user') || undefined
+  userId: url.searchParams.get('user') || undefined,
+  completionState: (url.searchParams.get('completion') || undefined) as
+    | ReportFilters['completionState']
+    | undefined
 });
 
 const reportError = (error: unknown): string =>
@@ -21,6 +24,9 @@ const reportError = (error: unknown): string =>
 export const load: PageServerLoad = async ({ locals, url }) => {
   if (!locals.user) redirect(303, '/login');
   const filters = parseFilters(url);
+  const today = reportService.today();
+  filters.dateFrom ??= `${today.slice(0, 7)}-01`;
+  filters.dateTo ??= today;
   try {
     const [tasks, people] = await Promise.all([
       reportService.taskReport(locals.user, filters),
@@ -37,7 +43,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
         to: filters.dateTo ?? '',
         statuses: filters.statuses ?? [],
         type: filters.taskType ?? '',
-        user: filters.userId ?? ''
+        user: filters.userId ?? '',
+        completion: filters.completionState ?? ''
       },
       summary: {
         total: tasks.length,
@@ -58,7 +65,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
         to: filters.dateTo ?? '',
         statuses: filters.statuses ?? [],
         type: filters.taskType ?? '',
-        user: filters.userId ?? ''
+        user: filters.userId ?? '',
+        completion: filters.completionState ?? ''
       },
       summary: { total: 0, passed: 0, failed: 0, overdue: 0, passRate: null },
       error: reportError(error)

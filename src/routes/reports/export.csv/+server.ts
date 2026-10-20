@@ -25,7 +25,10 @@ export const POST: RequestHandler = async ({ locals, request, url }) => {
     statuses: form.getAll('status').map(String) as TaskStatus[],
     taskType: (String(form.get('type') ?? '') || undefined) as
       TaskType | undefined,
-    userId: String(form.get('user') ?? '') || undefined
+    userId: String(form.get('user') ?? '') || undefined,
+    completionState: (String(form.get('completion') ?? '') || undefined) as
+      | ReportFilters['completionState']
+      | undefined
   };
   const peopleScope = String(form.get('scope') ?? '') === 'people';
 

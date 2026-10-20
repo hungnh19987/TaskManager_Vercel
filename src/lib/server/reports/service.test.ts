@@ -265,6 +265,62 @@ test('report validates date/type/status input and authorization', async () => {
   }
 });
 
+test('task report filters completion states and aggregates assigned/done quantities', async () => {
+  const fixture = await createFixture();
+  try {
+    const completedId = await fixture.tasks.createTask(fixture.staff, {
+      taskType: 'TEAM',
+      title: 'Completed quantity task',
+      deadline: '2026-10-25',
+      leadId: fixture.staff.id,
+      members: [
+        { userId: fixture.staff.id, content: 'Prepare packs', quantity: 10, unit: 'packs' },
+        { userId: fixture.staffTwo.id, content: 'Prepare packs', quantity: 5, unit: 'packs' }
+      ]
+    });
+    await fixture.db.query(
+      "UPDATE tasks SET status = 'PASSED', eval_result = 'PASS' WHERE id = $1",
+      [completedId]
+    );
+    await fixture.db.query(
+      'UPDATE task_members SET done_quantity = 4 WHERE task_id = $1 AND user_id = $2',
+      [completedId, fixture.staff.id]
+    );
+    const overdueId = await fixture.tasks.createTask(fixture.manager, {
+      taskType: 'DIRECT',
+      title: 'Overdue open task',
+      deadline: '2026-10-25',
+      leadId: fixture.staffTwo.id,
+      members: [{ userId: fixture.staffTwo.id, content: 'Finish report' }]
+    });
+    await fixture.db.query('UPDATE tasks SET deadline = $2::date WHERE id = $1', [
+      overdueId,
+      '2026-10-19'
+    ]);
+
+    const completed = await fixture.reports.taskReport(fixture.manager, {
+      completionState: 'COMPLETED'
+    });
+    assert.deepEqual(completed.map((task) => task.id), [completedId]);
+    assert.equal(completed[0].assigned_quantity, '15 packs');
+    assert.equal(completed[0].done_quantity, '4 packs');
+
+    const incomplete = await fixture.reports.taskReport(fixture.manager, {
+      completionState: 'INCOMPLETE'
+    });
+    assert.equal(incomplete.some((task) => task.id === completedId), false);
+    assert.equal(incomplete.some((task) => task.id === overdueId), true);
+
+    const overdue = await fixture.reports.taskReport(fixture.manager, {
+      completionState: 'OVERDUE'
+    });
+    assert.deepEqual(overdue.map((task) => task.id), [overdueId]);
+    assert.equal(overdue[0].overdue, true);
+  } finally {
+    await fixture.db.close();
+  }
+});
+
 test('CSV is UTF-8 BOM, preserves Vietnamese labels, and neutralizes formula/control prefixes', async () => {
   const fixture = await createFixture();
   try {

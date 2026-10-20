@@ -8,6 +8,7 @@ export type ReportFilters = {
   statuses?: TaskStatus[];
   taskType?: TaskType;
   userId?: string;
+  completionState?: 'COMPLETED' | 'INCOMPLETE' | 'OVERDUE';
 };
 
 export type ReportTask = {
@@ -23,6 +24,8 @@ export type ReportTask = {
   lead_name: string | null;
   member_count: number;
   avg_progress: number | null;
+  assigned_quantity: string | null;
+  done_quantity: string | null;
   overdue: boolean;
 };
 
@@ -485,13 +488,33 @@ export const createReportService = (
         `(t.proposer_id = ${userId} OR t.lead_id = ${userId} OR EXISTS (SELECT 1 FROM task_members mine WHERE mine.task_id = t.id AND mine.user_id = ${userId}))`
       );
     }
+    if (filters.completionState === 'COMPLETED')
+      where.push("t.status IN ('PASSED', 'FAILED')");
+    else if (filters.completionState === 'INCOMPLETE')
+      where.push("t.status NOT IN ('PASSED', 'FAILED')");
+    else if (filters.completionState === 'OVERDUE') {
+      where.push(`t.status = ANY(${bind(OPEN_STATUSES)}::text[])`);
+      where.push(`t.deadline < ${bind(today())}::date`);
+    }
     const { rows } = await database.query<RawRow>(
       `SELECT t.id, t.title, t.task_type, t.status, t.deadline, t.completed_at,
         t.eval_result, t.eval_comment, p.full_name AS proposer_name, l.full_name AS lead_name,
-        count(DISTINCT m.id)::int AS member_count, avg(m.progress)::float AS avg_progress
+        count(DISTINCT m.id)::int AS member_count, avg(m.progress)::float AS avg_progress,
+        v.assigned_quantity, v.done_quantity
        FROM tasks t JOIN users p ON p.id = t.proposer_id LEFT JOIN users l ON l.id = t.lead_id
-       LEFT JOIN task_members m ON m.task_id = t.id ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-       GROUP BY t.id, p.full_name, l.full_name ORDER BY t.deadline, t.id`,
+       LEFT JOIN task_members m ON m.task_id = t.id
+       LEFT JOIN (
+         SELECT task_id,
+           string_agg(trim_scale(assigned)::text || coalesce(' ' || unit, ''), ', ' ORDER BY unit) AS assigned_quantity,
+           string_agg(trim_scale(done)::text || coalesce(' ' || unit, ''), ', ' ORDER BY unit) AS done_quantity
+         FROM (
+           SELECT task_id, unit, sum(quantity) AS assigned, sum(done_quantity) AS done
+           FROM task_members GROUP BY task_id, unit
+         ) volume_by_unit
+         GROUP BY task_id
+       ) v ON v.task_id = t.id
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       GROUP BY t.id, p.full_name, l.full_name, v.assigned_quantity, v.done_quantity ORDER BY t.deadline, t.id`,
       params
     );
     const currentDate = today();
@@ -502,6 +525,8 @@ export const createReportService = (
       completed_at: row.completed_at ? String(row.completed_at) : null,
       member_count: Number(row.member_count),
       avg_progress: row.avg_progress === null ? null : Number(row.avg_progress),
+      assigned_quantity: row.assigned_quantity as string | null,
+      done_quantity: row.done_quantity as string | null,
       overdue:
         OPEN_STATUSES.includes(row.status as TaskStatus) &&
         dateValue(row.deadline as string | Date) < currentDate
@@ -512,7 +537,7 @@ export const createReportService = (
     actor: AuthUser,
     filters: Pick<
       ReportFilters,
-      'dateFrom' | 'dateTo' | 'statuses' | 'taskType' | 'userId'
+      'dateFrom' | 'dateTo' | 'statuses' | 'taskType' | 'userId' | 'completionState'
     > = {}
   ): Promise<PersonReport[]> => {
     await assertActive(database, actor);
@@ -558,6 +583,16 @@ export const createReportService = (
       taskClauses.push(
         `(t.proposer_id = $${userIdIndex} OR t.lead_id = $${userIdIndex} OR EXISTS (SELECT 1 FROM task_members related WHERE related.task_id = t.id AND related.user_id = $${userIdIndex}))`
       );
+    }
+    if (filters.completionState === 'COMPLETED')
+      taskClauses.push("t.status IN ('PASSED', 'FAILED')");
+    else if (filters.completionState === 'INCOMPLETE')
+      taskClauses.push("t.status NOT IN ('PASSED', 'FAILED')");
+    else if (filters.completionState === 'OVERDUE') {
+      params.push(OPEN_STATUSES);
+      taskClauses.push(`t.status = ANY($${params.length}::text[])`);
+      params.push(today());
+      taskClauses.push(`t.deadline < $${params.length}::date`);
     }
     const taskFilterSql = taskClauses.length
       ? `AND ${taskClauses.join(' AND ')}`
@@ -623,6 +658,8 @@ export const buildTaskCsv = (rows: ReportTask[]): Uint8Array => {
     ['proposer_name', 'Người đề xuất'],
     ['lead_name', 'Chủ trì'],
     ['member_count', 'Số người'],
+    ['assigned_quantity', 'Khối lượng được giao'],
+    ['done_quantity', 'Khối lượng đã thực hiện'],
     ['avg_progress', 'Tiến độ TB (%)'],
     ['overdue', 'Quá hạn'],
     ['eval_result', 'Kết quả đánh giá'],
