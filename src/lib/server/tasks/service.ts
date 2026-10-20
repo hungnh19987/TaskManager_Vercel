@@ -344,7 +344,7 @@ const addLog = async (
 ): Promise<void> => {
   await executor.query(
     'INSERT INTO task_logs (task_id, member_id, actor_id, action, detail) VALUES ($1, $2, $3, $4, $5::jsonb)',
-    [taskId, memberId ?? null, actorId, action, JSON.stringify(detail)]
+    [taskId, memberId ?? null, actorId, action, detail]
   );
 };
 

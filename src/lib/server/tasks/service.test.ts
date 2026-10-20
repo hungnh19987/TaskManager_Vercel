@@ -129,6 +129,20 @@ test('role/type matrix creates TEAM draft, DIRECT in progress, and PERSONAL pend
       members: [{ content: 'Write development plan' }]
     });
 
+    const { rows: createdLog } = await fixture.db.query<{
+      detail: Record<string, unknown>;
+    }>(
+      "SELECT detail FROM task_logs WHERE task_id = $1 AND action = 'TASK_CREATED'",
+      [teamId]
+    );
+    assert.deepEqual(createdLog[0].detail, {
+      taskType: 'TEAM',
+      title: 'Prepare monthly report',
+      status: 'DRAFT',
+      deadline: '2026-10-30',
+      leadId: fixture.staff.id
+    });
+
     assert.equal(
       (await fixture.service.getTask(fixture.staff, teamId)).status,
       'DRAFT'
