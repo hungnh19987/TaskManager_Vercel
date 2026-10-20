@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import postgres from 'postgres';

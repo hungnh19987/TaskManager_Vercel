@@ -97,7 +97,7 @@ test(
 );
 
 test(
-  'task log detail constraint migration repairs incompatible legacy check',
+  'task log detail constraint migration repairs a recorded but incorrect constraint',
   { timeout: 20_000 },
   async () => {
     const db = new PGlite();
@@ -110,7 +110,7 @@ test(
       `);
       const migration = migrations.find(
         ({ version }) =>
-          version === '202610200006_repair_task_log_detail_constraint'
+          version === '202610200007_reassert_task_log_detail_constraint'
       );
       assert.ok(migration);
       await db.exec(migration.sql);
