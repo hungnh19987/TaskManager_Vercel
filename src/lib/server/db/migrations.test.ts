@@ -97,6 +97,51 @@ test(
 );
 
 test(
+  'task log detail constraint migration repairs incompatible legacy check',
+  { timeout: 20_000 },
+  async () => {
+    const db = new PGlite();
+    try {
+      await applyMigrations(db);
+      await db.exec(`
+        ALTER TABLE task_logs DROP CONSTRAINT task_logs_detail_check;
+        ALTER TABLE task_logs ADD CONSTRAINT task_logs_detail_check
+          CHECK (jsonb_typeof(detail) = 'array');
+      `);
+      const migration = migrations.find(
+        ({ version }) =>
+          version === '202610200006_repair_task_log_detail_constraint'
+      );
+      assert.ok(migration);
+      await db.exec(migration.sql);
+
+      const { rows: users } = await db.query<{ id: number }>(
+        "INSERT INTO users (username, full_name, password_hash, role) VALUES ('log.test', 'Log Test', 'hash', 'STAFF') RETURNING id"
+      );
+      const { rows: tasks } = await db.query<{ id: number }>(
+        `INSERT INTO tasks (title, task_type, status, proposer_id, lead_id, deadline)
+         VALUES ('Log detail check', 'TEAM', 'DRAFT', $1, $1, '2026-10-30') RETURNING id`,
+        [users[0].id]
+      );
+      await db.query(
+        `INSERT INTO task_logs (task_id, actor_id, action, detail)
+         VALUES ($1, $2, 'TASK_CREATED', '{"taskType":"TEAM"}'::jsonb)`,
+        [tasks[0].id, users[0].id]
+      );
+      await assert.rejects(
+        db.query(
+          `INSERT INTO task_logs (task_id, actor_id, action, detail)
+           VALUES ($1, $2, 'TASK_CREATED', '["invalid"]'::jsonb)`,
+          [tasks[0].id, users[0].id]
+        )
+      );
+    } finally {
+      await db.close();
+    }
+  }
+);
+
+test(
   'workflow migration requires a result report at 100 percent',
   { timeout: 20_000 },
   async () => {
