@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TaskStatus } from '$lib/server/tasks/service';
 
-  let { data, form } = $props();
+  let { data } = $props();
   const types = [
     ['TEAM', 'Nhóm'],
     ['DIRECT', 'Giao trực tiếp'],
@@ -73,8 +73,6 @@
   </form>
 
   {#if data.error}<p class="notice error" role="alert">{data.error}</p>{/if}
-  {#if form?.error}<p class="notice error" role="alert">{form.error}</p>{/if}
-
   <section class="metrics" aria-label="Tổng quan báo cáo">
     <article>
       <span>Tổng công việc</span><strong>{data.summary.total}</strong>
@@ -103,7 +101,7 @@
         <p class="eyebrow">TASK REGISTER</p>
         <h2>Danh sách công việc</h2>
       </div>
-      <form method="POST" action="?/exportCsv">
+      <form method="POST" action="/reports/export.csv" target="_blank">
         <input type="hidden" name="from" value={data.filters.from} />
         <input type="hidden" name="to" value={data.filters.to} />
         <input type="hidden" name="type" value={data.filters.type} />
@@ -155,7 +153,7 @@
         <p class="eyebrow">PEOPLE</p>
         <h2>Thống kê theo người</h2>
       </div>
-      <form method="POST" action="?/exportCsv">
+      <form method="POST" action="/reports/export.csv" target="_blank">
         <input type="hidden" name="from" value={data.filters.from} />
         <input type="hidden" name="to" value={data.filters.to} />
         <input type="hidden" name="type" value={data.filters.type} />
