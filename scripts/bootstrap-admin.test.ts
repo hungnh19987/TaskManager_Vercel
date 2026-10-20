@@ -73,14 +73,16 @@ test(
       const account = await db.query<{ id: number }>(
         "SELECT id FROM users WHERE username = 'first.admin'"
       );
-      const logs = await db.query<{ action: string }>(
-        'SELECT action FROM account_logs WHERE target_user_id = $1',
+      const logs = await db.query<{ action: string; detail: unknown }>(
+        'SELECT action, detail FROM account_logs WHERE target_user_id = $1',
         [account.rows[0].id]
       );
-      assert.deepEqual(
-        logs.rows.map((entry) => entry.action),
-        ['ACCOUNT_CREATED']
-      );
+      assert.deepEqual(logs.rows, [
+        {
+          action: 'ACCOUNT_CREATED',
+          detail: { username: 'first.admin', role: 'ADMIN' }
+        }
+      ]);
       await assert.rejects(
         bootstrapFirstAdmin(database, passwordCodec, {
           username: 'second.admin',

@@ -151,7 +151,7 @@ const writeAccountLog = async (
 ): Promise<void> => {
   await transaction.query(
     'INSERT INTO account_logs (actor_id, target_user_id, action, detail) VALUES ($1, $2, $3, $4::jsonb)',
-    [actorId, targetId, action, JSON.stringify(detail)]
+    [actorId, targetId, action, detail]
   );
 };
 

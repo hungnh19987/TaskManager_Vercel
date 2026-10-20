@@ -221,6 +221,17 @@ test('ADMIN account operations enforce roles and revoke sessions after reset', a
       role: 'STAFF'
     });
     assert.equal((await service.listAccounts(adminId)).length, 4);
+    const createdAccount = await db.query<{ id: string }>(
+      "SELECT id FROM users WHERE username = 'new.staff'"
+    );
+    const creationLog = await db.query<{ detail: unknown }>(
+      'SELECT detail FROM account_logs WHERE target_user_id = $1 AND action = $2',
+      [createdAccount.rows[0].id, 'ACCOUNT_CREATED']
+    );
+    assert.deepEqual(creationLog.rows[0].detail, {
+      username: 'new.staff',
+      role: 'STAFF'
+    });
 
     await service.resetPassword(adminId, staffId, 'reset-password-123');
     assert.equal(await service.getCurrentUser(staffSession.token), null);

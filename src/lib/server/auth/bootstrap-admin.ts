@@ -51,8 +51,8 @@ export const bootstrapFirstAdmin = async (
     const adminId = String(rows[0].id);
     await transaction.query(
       `INSERT INTO account_logs (actor_id, target_user_id, action, detail)
-       VALUES ($1, $1, 'ACCOUNT_CREATED', $2::jsonb)`,
-      [adminId, JSON.stringify({ username, role: 'ADMIN', bootstrap: true })]
+       VALUES ($1, $1, 'ACCOUNT_CREATED', jsonb_build_object('username', $2::text, 'role', 'ADMIN'))`,
+      [adminId, username]
     );
   });
 };
