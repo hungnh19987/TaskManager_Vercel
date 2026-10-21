@@ -16,6 +16,7 @@
       <nav aria-label="Tài khoản">
         <a href="/tasks">Công việc</a>
         <a href="/approvals">Phê duyệt</a>
+        <a href="/reports">Thống kê</a>
         <span class="identity"
           >{data.user.fullName} <small>{data.user.role}</small></span
         >
