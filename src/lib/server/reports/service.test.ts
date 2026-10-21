@@ -304,6 +304,12 @@ test('task report filters completion states and aggregates assigned/done quantit
     assert.deepEqual(completed.map((task) => task.id), [completedId]);
     assert.equal(completed[0].assigned_quantity, '15 packs');
     assert.equal(completed[0].done_quantity, '4 packs');
+    assert.equal(completed[0].members.length, 2);
+    assert.equal(
+      completed[0].members.find((member) => member.user_id === fixture.staff.id)
+        ?.progress,
+      0
+    );
 
     const incomplete = await fixture.reports.taskReport(fixture.manager, {
       completionState: 'INCOMPLETE'

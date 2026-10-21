@@ -3,12 +3,11 @@ import type { Actions, PageServerLoad } from './$types';
 import { requireSameOrigin } from '$lib/server/auth/action-guards';
 import { reportService } from '$lib/server/reports/runtime';
 import { ReportError, type ReportFilters } from '$lib/server/reports/service';
-import type { TaskStatus, TaskType } from '$lib/server/tasks/service';
+import type { TaskType } from '$lib/server/tasks/service';
 
 const parseFilters = (url: URL): ReportFilters => ({
   dateFrom: url.searchParams.get('from') || undefined,
   dateTo: url.searchParams.get('to') || undefined,
-  statuses: url.searchParams.getAll('status') as TaskStatus[],
   taskType: (url.searchParams.get('type') || undefined) as TaskType | undefined,
   userId: url.searchParams.get('user') || undefined,
   completionState: (url.searchParams.get('completion') || undefined) as
@@ -26,7 +25,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   const filters = parseFilters(url);
   const today = reportService.today();
   filters.dateFrom ??= `${today.slice(0, 7)}-01`;
-  filters.dateTo ??= today;
+  filters.dateTo ??= new Date(
+    Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)
+  )
+    .toISOString()
+    .slice(0, 10);
   try {
     const [tasks, people] = await Promise.all([
       reportService.taskReport(locals.user, filters),
@@ -41,7 +44,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       filters: {
         from: filters.dateFrom ?? '',
         to: filters.dateTo ?? '',
-        statuses: filters.statuses ?? [],
         type: filters.taskType ?? '',
         user: filters.userId ?? '',
         completion: filters.completionState ?? ''
@@ -63,7 +65,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
       filters: {
         from: filters.dateFrom ?? '',
         to: filters.dateTo ?? '',
-        statuses: filters.statuses ?? [],
         type: filters.taskType ?? '',
         user: filters.userId ?? '',
         completion: filters.completionState ?? ''

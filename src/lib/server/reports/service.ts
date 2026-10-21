@@ -26,7 +26,18 @@ export type ReportTask = {
   avg_progress: number | null;
   assigned_quantity: string | null;
   done_quantity: string | null;
+  members: ReportTaskMember[];
   overdue: boolean;
+};
+
+export type ReportTaskMember = {
+  user_id: string;
+  full_name: string;
+  content: string;
+  quantity: string | null;
+  unit: string | null;
+  done_quantity: string | null;
+  progress: number;
 };
 
 export type PersonReport = {
@@ -500,9 +511,18 @@ export const createReportService = (
       `SELECT t.id, t.title, t.task_type, t.status, t.deadline, t.completed_at,
         t.eval_result, t.eval_comment, p.full_name AS proposer_name, l.full_name AS lead_name,
         count(DISTINCT m.id)::int AS member_count, avg(m.progress)::float AS avg_progress,
-        v.assigned_quantity, v.done_quantity
+        v.assigned_quantity, v.done_quantity,
+        coalesce(json_agg(json_build_object(
+          'user_id', m.user_id::text,
+          'full_name', u.full_name,
+          'content', m.content,
+          'quantity', trim_scale(m.quantity)::text,
+          'unit', m.unit,
+          'done_quantity', trim_scale(m.done_quantity)::text,
+          'progress', m.progress
+        ) ORDER BY lower(u.full_name)) FILTER (WHERE m.id IS NOT NULL), '[]'::json) AS members
        FROM tasks t JOIN users p ON p.id = t.proposer_id LEFT JOIN users l ON l.id = t.lead_id
-       LEFT JOIN task_members m ON m.task_id = t.id
+       LEFT JOIN task_members m ON m.task_id = t.id LEFT JOIN users u ON u.id = m.user_id
        LEFT JOIN (
          SELECT task_id,
            string_agg(trim_scale(assigned)::text || coalesce(' ' || unit, ''), ', ' ORDER BY unit) AS assigned_quantity,
@@ -527,6 +547,7 @@ export const createReportService = (
       avg_progress: row.avg_progress === null ? null : Number(row.avg_progress),
       assigned_quantity: row.assigned_quantity as string | null,
       done_quantity: row.done_quantity as string | null,
+      members: row.members as ReportTaskMember[],
       overdue:
         OPEN_STATUSES.includes(row.status as TaskStatus) &&
         dateValue(row.deadline as string | Date) < currentDate

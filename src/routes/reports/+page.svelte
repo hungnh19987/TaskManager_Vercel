@@ -1,20 +1,9 @@
 <script lang="ts">
-  import type { TaskStatus } from '$lib/server/tasks/service';
-
   let { data } = $props();
   const types = [
     ['TEAM', 'Nhóm'],
     ['DIRECT', 'Giao trực tiếp'],
     ['PERSONAL', 'Cá nhân']
-  ];
-  const statuses: Array<[TaskStatus, string]> = [
-    ['DRAFT', 'Nháp'],
-    ['PENDING_APPROVAL', 'Chờ duyệt'],
-    ['REJECTED', 'Bị từ chối'],
-    ['IN_PROGRESS', 'Đang thực hiện'],
-    ['REPORTED', 'Chờ đánh giá'],
-    ['PASSED', 'Đạt'],
-    ['FAILED', 'Không đạt']
   ];
   const completionStates = [
     ['', 'Tất cả'],
@@ -68,14 +57,6 @@
       ></label
     >
     <label
-      >Trạng thái chi tiết<select name="status" multiple size="3"
-        >{#each statuses as [value, label]}<option
-            {value}
-            selected={data.filters.statuses.includes(value)}>{label}</option
-          >{/each}</select
-      ></label
-    >
-    <label
       >Người liên quan<select name="user" value={data.filters.user}
         ><option value="">Tất cả</option>{#each data.people as person}<option
             value={person.user_id}>{person.full_name}</option
@@ -121,11 +102,6 @@
         <input type="hidden" name="user" value={data.filters.user} />
         <input type="hidden" name="completion" value={data.filters.completion} />
         <input type="hidden" name="scope" value="tasks" />
-        {#each data.filters.statuses as status}<input
-            type="hidden"
-            name="status"
-            value={status}
-          />{/each}
         <button class="download" type="submit" disabled={!data.tasks.length}
           >Tải CSV <span aria-hidden="true">↓</span></button
         >
@@ -144,7 +120,29 @@
             ></thead
           ><tbody>
             {#each data.tasks as task (task.id)}<tr
-                ><td><a href={`/tasks/${task.id}`}>{task.title}</a></td
+                ><td class="title"><a href={`/tasks/${task.id}`}>{task.title}</a
+                  >{#if task.task_type === 'TEAM'}<details class="team-detail">
+                    <summary>Xem tiến độ nhóm · {task.members.length}</summary>
+                    {#if task.members.length === 0}<p class="team-empty">
+                        Chưa có thành viên được phân công.
+                      </p>{:else}<table class="member-table">
+                        <thead><tr><th>Thành viên</th><th>Phần việc</th><th
+                            >Khối lượng giao</th
+                          ><th>Đã thực hiện</th><th>Tiến độ</th></tr></thead
+                        ><tbody>
+                          {#each task.members as member (member.user_id)}<tr>
+                            <td>{member.full_name}</td><td>{member.content}</td
+                            ><td>{member.quantity
+                                ? `${member.quantity}${member.unit ? ` ${member.unit}` : ''}`
+                                : '—'}</td
+                            ><td>{member.done_quantity
+                                ? `${member.done_quantity}${member.unit ? ` ${member.unit}` : ''}`
+                                : '—'}</td
+                            ><td>{member.progress}%</td></tr
+                          >{/each}
+                        </tbody>
+                      </table>{/if}
+                  </details>{/if}</td
                 ><td>{labels[task.task_type]}</td><td
                   ><span class="status">{labels[task.status]}</span></td
                 ><td>{task.lead_name ?? '—'}</td
@@ -175,11 +173,6 @@
         <input type="hidden" name="user" value={data.filters.user} />
         <input type="hidden" name="completion" value={data.filters.completion} />
         <input type="hidden" name="scope" value="people" />
-        {#each data.filters.statuses as status}<input
-            type="hidden"
-            name="status"
-            value={status}
-          />{/each}
         <button class="download" type="submit" disabled={!data.people.length}
           >Tải thống kê CSV <span aria-hidden="true">↓</span></button
         >
@@ -375,10 +368,41 @@
     text-decoration: none;
   }
   td.title {
-    max-width: 260px;
-    overflow: hidden;
+    max-width: 320px;
     color: #2b3930;
-    text-overflow: ellipsis;
+  }
+  .team-detail {
+    margin-top: 7px;
+    color: #53634d;
+    font-size: 10px;
+    white-space: normal;
+  }
+  .team-detail summary {
+    width: fit-content;
+    color: #58733e;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .team-detail[open] {
+    min-width: 600px;
+  }
+  .member-table {
+    margin-top: 8px;
+    border: 1px solid #dce1d8;
+    background: #fff;
+    white-space: normal;
+  }
+  .member-table th {
+    padding: 7px;
+    font-size: 9px;
+  }
+  .member-table td {
+    padding: 7px;
+    font-size: 10px;
+  }
+  .team-empty {
+    margin: 8px 0 0;
+    color: #788179;
   }
   .status {
     background: #edf0e8;
