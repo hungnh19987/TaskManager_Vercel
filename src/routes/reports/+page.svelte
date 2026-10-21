@@ -28,13 +28,13 @@
   };
 </script>
 
-<svelte:head><title>Báo cáo | Task Manager</title></svelte:head>
+<svelte:head><title>Thống kê | Task Manager</title></svelte:head>
 
 <main>
   <div class="heading">
     <div>
       <p class="eyebrow">ANALYTICS · REPORTS</p>
-      <h1>Báo cáo công việc</h1>
+      <h1>Thống kê công việc</h1>
     </div>
   </div>
   <form method="GET" class="filters">

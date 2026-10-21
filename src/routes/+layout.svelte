@@ -13,10 +13,12 @@
         <span class="brand-mark" aria-hidden="true">T</span>
         <span>Task Manager</span>
       </a>
-      <nav aria-label="Tài khoản">
+      <nav class="primary-navigation" aria-label="Điều hướng chính">
         <a href="/tasks">Công việc</a>
         <a href="/approvals">Phê duyệt</a>
         <a href="/reports">Thống kê</a>
+      </nav>
+      <nav class="account-navigation" aria-label="Tài khoản">
         <span class="identity"
           >{data.user.fullName} <small>{data.user.role}</small></span
         >
@@ -80,6 +82,17 @@
     justify-content: flex-end;
     gap: 20px;
   }
+  .primary-navigation {
+    margin-left: auto;
+    margin-right: 28px;
+  }
+  .primary-navigation a {
+    color: #29372e;
+    font-weight: 600;
+  }
+  .account-navigation {
+    gap: 16px;
+  }
   nav a,
   nav button {
     border: 0;
@@ -119,6 +132,9 @@
       flex-wrap: wrap;
       justify-content: flex-start;
       gap: 14px;
+    }
+    .primary-navigation {
+      margin: 4px 0 0;
     }
     .identity {
       margin-right: auto;

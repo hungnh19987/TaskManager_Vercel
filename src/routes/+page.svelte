@@ -167,7 +167,7 @@
         <p class="eyebrow">CAPACITY</p>
         <h2>Tải công việc theo người</h2>
       </div>
-      <a href="/reports">Báo cáo ↗</a>
+      <a href="/reports">Thống kê ↗</a>
     </div>
     <div class="table-wrap">
       <table>
