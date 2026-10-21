@@ -6,7 +6,12 @@ import { PGlite } from '@electric-sql/pglite';
 import type { AuthUser, Role } from '../auth/service';
 import type { QueryExecutor, TransactionalDatabase } from '../db/transactional';
 import { createTaskService, type TaskStatus } from '../tasks/service';
-import { buildPeopleCsv, buildTaskCsv, createReportService } from './service';
+import {
+  buildPeopleCsv,
+  buildPersonTaskCsv,
+  buildTaskCsv,
+  createReportService
+} from './service';
 
 const migrationDirectory = resolve(process.cwd(), 'supabase/migrations');
 const migrationFiles = (await readdir(migrationDirectory))
@@ -328,6 +333,67 @@ test('TEAM lead progress is weighted by total completed quantity over total assi
     const lead = people.find((person) => person.user_id === fixture.staff.id);
     assert.equal(lead?.parts, 1);
     assert.equal(lead?.avg_progress, 55);
+  } finally {
+    await fixture.db.close();
+  }
+});
+
+test('person task CSV exports individual assignments and weighted TEAM lead summary', async () => {
+  const fixture = await createFixture();
+  try {
+    const taskId = await fixture.tasks.createTask(fixture.staff, {
+      taskType: 'TEAM',
+      title: 'CSV weighted team task',
+      deadline: '2026-10-25',
+      leadId: fixture.staff.id,
+      members: [
+        {
+          userId: fixture.staff.id,
+          content: 'Lead individual assignment',
+          quantity: 90,
+          unit: 'items'
+        },
+        {
+          userId: fixture.staffTwo.id,
+          content: 'Member assignment',
+          quantity: 10,
+          unit: 'items'
+        }
+      ]
+    });
+    await fixture.db.query(
+      "UPDATE tasks SET status = 'IN_PROGRESS' WHERE id = $1",
+      [taskId]
+    );
+    await fixture.db.query(
+      'UPDATE task_members SET done_quantity = 45, progress = 50 WHERE task_id = $1 AND user_id = $2',
+      [taskId, fixture.staff.id]
+    );
+    await fixture.db.query(
+      "UPDATE task_members SET done_quantity = 10, progress = 100, result_report = 'Complete' WHERE task_id = $1 AND user_id = $2",
+      [taskId, fixture.staffTwo.id]
+    );
+
+    const rows = await fixture.reports.personTaskReport(fixture.manager, {
+      dateFrom: '2026-10-20',
+      dateTo: '2026-10-31'
+    });
+    const leadRow = rows.find((row) => row.user_id === fixture.staff.id);
+    assert.equal(leadRow?.assignment, 'Chủ trì nhóm');
+    assert.equal(leadRow?.assigned_quantity, '100 items');
+    assert.equal(leadRow?.done_quantity, '55 items');
+    assert.equal(leadRow?.progress, 55);
+    assert.equal(
+      rows.filter((row) => row.user_id === fixture.staff.id).length,
+      1
+    );
+
+    const csv = buildPersonTaskCsv(rows);
+    const decoded = new TextDecoder().decode(csv);
+    assert.deepEqual(Array.from(csv.slice(0, 3)), [0xef, 0xbb, 0xbf]);
+    assert.equal(decoded.includes('Người thực hiện / chủ trì'), true);
+    assert.equal(decoded.includes('Chủ trì nhóm'), true);
+    assert.equal(decoded.includes('55'), true);
   } finally {
     await fixture.db.close();
   }

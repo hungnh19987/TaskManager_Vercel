@@ -4,6 +4,7 @@ import { requireSameOrigin } from '$lib/server/auth/action-guards';
 import {
   reportService,
   buildPeopleCsv,
+  buildPersonTaskCsv,
   buildTaskCsv
 } from '$lib/server/reports/runtime';
 import { ReportError, type ReportFilters } from '$lib/server/reports/service';
@@ -29,16 +30,27 @@ export const POST: RequestHandler = async ({ locals, request, url }) => {
     completionState: (String(form.get('completion') ?? '') || undefined) as
       ReportFilters['completionState'] | undefined
   };
-  const peopleScope = String(form.get('scope') ?? '') === 'people';
+  const scope = String(form.get('scope') ?? 'tasks');
+  const peopleScope = scope === 'people';
+  const personTasksScope = scope === 'person-tasks';
 
   try {
-    const csv = peopleScope
-      ? buildPeopleCsv(await reportService.peopleReport(locals.user, filters))
-      : buildTaskCsv(await reportService.taskReport(locals.user, filters));
+    const csv = personTasksScope
+      ? buildPersonTaskCsv(
+          await reportService.personTaskReport(locals.user, filters)
+        )
+      : peopleScope
+        ? buildPeopleCsv(await reportService.peopleReport(locals.user, filters))
+        : buildTaskCsv(await reportService.taskReport(locals.user, filters));
+    const filename = personTasksScope
+      ? 'person-task-details'
+      : peopleScope
+        ? 'people-report'
+        : 'task-report';
     return new Response(csv, {
       headers: {
         'content-type': 'text/csv; charset=utf-8',
-        'content-disposition': `attachment; filename="${peopleScope ? 'people-report' : 'task-report'}.csv"`,
+        'content-disposition': `attachment; filename="${filename}.csv"`,
         'cache-control': 'no-store',
         'x-content-type-options': 'nosniff'
       }

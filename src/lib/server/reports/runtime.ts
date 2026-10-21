@@ -1,5 +1,10 @@
 import { getAuthDatabase } from '../db/auth-database';
-import { buildPeopleCsv, buildTaskCsv, createReportService } from './service';
+import {
+	buildPeopleCsv,
+	buildPersonTaskCsv,
+	buildTaskCsv,
+	createReportService
+} from './service';
 
 export const reportService = createReportService(getAuthDatabase());
-export { buildPeopleCsv, buildTaskCsv };
+export { buildPeopleCsv, buildPersonTaskCsv, buildTaskCsv };

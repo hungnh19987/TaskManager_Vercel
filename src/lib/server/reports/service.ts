@@ -54,6 +54,21 @@ export type PersonReport = {
   led_failed: number;
 };
 
+export type PersonTaskReport = {
+  user_id: string;
+  full_name: string;
+  task_id: string;
+  task_title: string;
+  task_type: TaskType;
+  status: TaskStatus;
+  deadline: string;
+  assignment: string;
+  assigned_quantity: string | null;
+  done_quantity: string | null;
+  progress: number | null;
+  eval_result: 'PASS' | 'FAIL' | null;
+};
+
 export type OverviewTask = {
   id: string;
   title: string;
@@ -686,7 +701,122 @@ export const createReportService = (
     })) as PersonReport[];
   };
 
-  return { overview, myWork, taskReport, peopleReport, today };
+  const personTaskReport = async (
+    actor: AuthUser,
+    filters: Pick<
+      ReportFilters,
+      'dateFrom' | 'dateTo' | 'statuses' | 'taskType' | 'userId' | 'completionState'
+    > = {}
+  ): Promise<PersonTaskReport[]> => {
+    await assertActive(database, actor);
+    const dateFrom = validateDate(filters.dateFrom, 'Từ ngày');
+    const dateTo = validateDate(filters.dateTo, 'Đến ngày');
+    if (dateFrom && dateTo && dateFrom > dateTo)
+      throw new ReportError('VALIDATION', 'Từ ngày phải trước hoặc bằng Đến ngày.');
+    for (const status of filters.statuses ?? []) {
+      if (!VALID_STATUSES.includes(status))
+        throw new ReportError('VALIDATION', 'Trạng thái không hợp lệ.');
+    }
+    if (filters.taskType && !VALID_TYPES.includes(filters.taskType))
+      throw new ReportError('VALIDATION', 'Loại công việc không hợp lệ.');
+
+    const params: unknown[] = [];
+    const dateClauses: string[] = [];
+    if (dateFrom) {
+      params.push(dateFrom);
+      dateClauses.push(`t.deadline >= $${params.length}::date`);
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      dateClauses.push(`t.deadline <= $${params.length}::date`);
+    }
+    const taskClauses: string[] = [];
+    if (filters.statuses?.length) {
+      params.push(filters.statuses);
+      taskClauses.push(`t.status = ANY($${params.length}::text[])`);
+    }
+    if (filters.taskType) {
+      params.push(filters.taskType);
+      taskClauses.push(`t.task_type = $${params.length}`);
+    }
+    if (filters.userId) {
+      params.push(filters.userId);
+      const userIdIndex = params.length;
+      taskClauses.push(
+        `(t.proposer_id = $${userIdIndex} OR t.lead_id = $${userIdIndex} OR EXISTS (SELECT 1 FROM task_members related WHERE related.task_id = t.id AND related.user_id = $${userIdIndex}))`
+      );
+    }
+    if (filters.completionState === 'COMPLETED')
+      taskClauses.push("t.status IN ('PASSED', 'FAILED')");
+    else if (filters.completionState === 'INCOMPLETE')
+      taskClauses.push("t.status NOT IN ('PASSED', 'FAILED')");
+    else if (filters.completionState === 'OVERDUE') {
+      params.push(OPEN_STATUSES);
+      taskClauses.push(`t.status = ANY($${params.length}::text[])`);
+      params.push(today());
+      taskClauses.push(`t.deadline < $${params.length}::date`);
+    }
+    const executedIndex = params.length + 1;
+    const todayIndex = params.length + 2;
+    const { rows } = await database.query<RawRow>(
+      `WITH eligible_tasks AS (
+        SELECT t.* FROM tasks t
+        WHERE t.status = ANY($${executedIndex}::text[])
+          ${dateClauses.length ? `AND ${dateClauses.join(' AND ')}` : ''}
+          ${taskClauses.length ? `AND ${taskClauses.join(' AND ')}` : ''}
+       ), team_unit_volumes AS (
+        SELECT task_id, unit, sum(quantity) AS assigned, sum(done_quantity) AS done
+        FROM task_members GROUP BY task_id, unit
+       ), team_volume_display AS (
+        SELECT task_id,
+          string_agg(trim_scale(assigned)::text || coalesce(' ' || unit, ''), ', ' ORDER BY unit) AS assigned_quantity,
+          string_agg(trim_scale(done)::text || coalesce(' ' || unit, ''), ', ' ORDER BY unit) AS done_quantity
+        FROM team_unit_volumes GROUP BY task_id
+       ), work_items AS (
+        SELECT m.user_id, u.full_name, t.id AS task_id, t.title AS task_title,
+          t.task_type, t.status, t.deadline, m.content AS assignment,
+          CASE WHEN m.quantity IS NULL THEN NULL
+            ELSE trim_scale(m.quantity)::text || coalesce(' ' || m.unit, '') END AS assigned_quantity,
+          CASE WHEN m.done_quantity IS NULL THEN NULL
+            ELSE trim_scale(m.done_quantity)::text || coalesce(' ' || m.unit, '') END AS done_quantity,
+          m.progress::float AS progress, t.eval_result
+        FROM task_members m JOIN eligible_tasks t ON t.id = m.task_id
+        JOIN users u ON u.id = m.user_id
+        WHERE t.task_type <> 'TEAM' OR m.user_id <> t.lead_id
+        UNION ALL
+        SELECT t.lead_id AS user_id, lead.full_name, t.id AS task_id, t.title AS task_title,
+          t.task_type, t.status, t.deadline, 'Chủ trì nhóm' AS assignment,
+          v.assigned_quantity, v.done_quantity,
+          CASE WHEN sum(m.quantity) > 0 THEN
+            (coalesce(sum(m.done_quantity) FILTER (WHERE m.quantity IS NOT NULL), 0)
+              / sum(m.quantity)) * 100
+            ELSE avg(m.progress)::numeric END::float AS progress,
+          t.eval_result
+        FROM eligible_tasks t
+        JOIN users lead ON lead.id = t.lead_id
+        LEFT JOIN task_members m ON m.task_id = t.id
+        LEFT JOIN team_volume_display v ON v.task_id = t.id
+        WHERE t.task_type = 'TEAM'
+        GROUP BY t.id, t.lead_id, lead.full_name, t.title, t.task_type,
+          t.status, t.deadline, v.assigned_quantity, v.done_quantity, t.eval_result
+       )
+       SELECT user_id::text AS user_id, full_name, task_id::text AS task_id,
+        task_title, task_type, status, deadline, assignment, assigned_quantity,
+        done_quantity, progress, eval_result
+       FROM work_items
+       ORDER BY lower(full_name), deadline, task_id`,
+      [...params, EXECUTED_STATUSES]
+    );
+    return rows.map((row) => ({
+      ...row,
+      user_id: String(row.user_id),
+      task_id: String(row.task_id),
+      deadline: dateValue(row.deadline as string | Date),
+      progress: row.progress === null ? null : Number(row.progress)
+    })) as PersonTaskReport[];
+  };
+
+  return { overview, myWork, taskReport, peopleReport, personTaskReport, today };
 };
 
 export const buildTaskCsv = (rows: ReportTask[]): Uint8Array => {
@@ -775,6 +905,54 @@ export const buildPeopleCsv = (rows: PersonReport[]): Uint8Array => {
       )
     ].join('\r\n') + '\r\n';
   const content = new TextEncoder().encode(body);
+  const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+  const csv = new Uint8Array(bom.length + content.length);
+  csv.set(bom);
+  csv.set(content, bom.length);
+  return csv;
+};
+
+export const buildPersonTaskCsv = (rows: PersonTaskReport[]): Uint8Array => {
+  const labels: Record<string, string> = {
+    TEAM: 'Nhóm',
+    DIRECT: 'Trực tiếp',
+    PERSONAL: 'Cá nhân',
+    IN_PROGRESS: 'Đang thực hiện',
+    REPORTED: 'Chờ đánh giá',
+    PASSED: 'Đạt',
+    FAILED: 'Không đạt',
+    PASS: 'Đạt',
+    FAIL: 'Không đạt'
+  };
+  const columns: Array<[keyof PersonTaskReport, string]> = [
+    ['full_name', 'Người thực hiện / chủ trì'],
+    ['task_id', 'Mã công việc'],
+    ['task_title', 'Tên công việc'],
+    ['task_type', 'Loại công việc'],
+    ['status', 'Trạng thái'],
+    ['assignment', 'Phần việc'],
+    ['deadline', 'Hạn hoàn thành'],
+    ['assigned_quantity', 'Khối lượng được giao'],
+    ['done_quantity', 'Khối lượng đã thực hiện'],
+    ['progress', 'Tiến độ (%)'],
+    ['eval_result', 'Đánh giá']
+  ];
+  const lines = [
+    columns.map(([, heading]) => csvQuote(heading)).join(','),
+    ...rows.map((row) =>
+      columns
+        .map(([key]) => {
+          const value = row[key];
+          if (key === 'task_type' || key === 'status' || key === 'eval_result')
+            return csvQuote(value ? (labels[String(value)] ?? value) : '');
+          if (key === 'progress')
+            return csvQuote(value === null ? '' : Math.round(Number(value)));
+          return csvQuote(value);
+        })
+        .join(',')
+    )
+  ];
+  const content = new TextEncoder().encode(`${lines.join('\r\n')}\r\n`);
   const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
   const csv = new Uint8Array(bom.length + content.length);
   csv.set(bom);

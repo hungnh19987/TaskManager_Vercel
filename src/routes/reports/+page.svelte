@@ -213,6 +213,22 @@
           >Tải thống kê CSV <span aria-hidden="true">↓</span></button
         >
       </form>
+      <form method="POST" action="/reports/export.csv" target="_blank">
+        <input type="hidden" name="from" value={data.filters.from} />
+        <input type="hidden" name="to" value={data.filters.to} />
+        <input type="hidden" name="type" value={data.filters.type} />
+        <input type="hidden" name="user" value={data.filters.user} />
+        <input
+          type="hidden"
+          name="completion"
+          value={data.filters.completion}
+        />
+        <input type="hidden" name="scope" value="person-tasks" />
+        <button class="download" type="submit" disabled={!data.people.length}
+          >Tải chi tiết công việc theo người CSV <span aria-hidden="true">↓</span
+          ></button
+        >
+      </form>
     </div>
     {#if data.people.length === 0}<p class="empty">
         Không có dữ liệu trong kỳ.
