@@ -192,13 +192,14 @@ export const createAuthService = ({
     }
 
     const token = createToken();
-    const expiresAt = new Date(now().getTime() + SESSION_DURATION_MS);
+    const createdAt = now();
+    const expiresAt = new Date(createdAt.getTime() + SESSION_DURATION_MS);
     const { rows: sessions } = await database.query<{ id: string }>(
-      `INSERT INTO sessions (user_id, token_hash, auth_version, expires_at)
-			 SELECT id, $2, auth_version, $4 FROM users
-			 WHERE id = $1 AND is_active = true AND auth_version = $3
+      `INSERT INTO sessions (user_id, token_hash, auth_version, created_at, expires_at)
+                         SELECT id, $2, auth_version, $4, $5 FROM users
+                         WHERE id = $1 AND is_active = true AND auth_version = $3
 			 RETURNING id`,
-      [row.id, tokenDigest(token), row.auth_version, expiresAt]
+      [row.id, tokenDigest(token), row.auth_version, createdAt, expiresAt]
     );
     if (!sessions[0]) {
       throw new AuthError(

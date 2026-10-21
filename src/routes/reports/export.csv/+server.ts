@@ -27,8 +27,7 @@ export const POST: RequestHandler = async ({ locals, request, url }) => {
       TaskType | undefined,
     userId: String(form.get('user') ?? '') || undefined,
     completionState: (String(form.get('completion') ?? '') || undefined) as
-      | ReportFilters['completionState']
-      | undefined
+      ReportFilters['completionState'] | undefined
   };
   const peopleScope = String(form.get('scope') ?? '') === 'people';
 

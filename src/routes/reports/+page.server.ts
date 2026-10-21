@@ -11,8 +11,7 @@ const parseFilters = (url: URL): ReportFilters => ({
   taskType: (url.searchParams.get('type') || undefined) as TaskType | undefined,
   userId: url.searchParams.get('user') || undefined,
   completionState: (url.searchParams.get('completion') || undefined) as
-    | ReportFilters['completionState']
-    | undefined
+    ReportFilters['completionState'] | undefined
 });
 
 const reportError = (error: unknown): string =>

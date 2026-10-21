@@ -52,8 +52,8 @@
     >
     <label
       >Tiến độ<select name="completion" value={data.filters.completion}
-        >{#each completionStates as [value, label]}<option
-            {value}>{label}</option
+        >{#each completionStates as [value, label]}<option {value}
+            >{label}</option
           >{/each}</select
       ></label
     >
@@ -101,7 +101,11 @@
         <input type="hidden" name="to" value={data.filters.to} />
         <input type="hidden" name="type" value={data.filters.type} />
         <input type="hidden" name="user" value={data.filters.user} />
-        <input type="hidden" name="completion" value={data.filters.completion} />
+        <input
+          type="hidden"
+          name="completion"
+          value={data.filters.completion}
+        />
         <input type="hidden" name="scope" value="tasks" />
         <button class="download" type="submit" disabled={!data.tasks.length}
           >Tải CSV <span aria-hidden="true">↓</span></button
@@ -115,62 +119,73 @@
         <table>
           <thead
             ><tr
-              ><th>Tên công việc</th><th>Loại công việc</th><th>Trạng thái công việc</th
-              ><th>Chủ trì</th><th>Hạn hoàn thành</th><th>Khối lượng được giao</th
-              ><th>Khối lượng đã thực hiện</th><th>Tiến độ</th><th>Đánh giá</th></tr
+              ><th>Tên công việc</th><th>Loại công việc</th><th
+                >Trạng thái công việc</th
+              ><th>Chủ trì</th><th>Hạn hoàn thành</th><th
+                >Khối lượng được giao</th
+              ><th>Khối lượng đã thực hiện</th><th>Tiến độ</th><th>Đánh giá</th
+              ></tr
             ></thead
           ><tbody>
             {#each data.tasks as task (task.id)}<tr
-                ><td class="title"><a href={`/tasks/${task.id}`}>{task.title}</a
+                ><td class="title"
+                  ><a href={`/tasks/${task.id}`}>{task.title}</a
                   >{#if task.task_type === 'TEAM'}<button
-                    class="team-toggle"
-                    type="button"
-                    aria-expanded={expandedTaskId === task.id}
-                    aria-controls={`team-progress-${task.id}`}
-                    onclick={() =>
-                      (expandedTaskId =
-                        expandedTaskId === task.id ? null : task.id)}
-                    >{expandedTaskId === task.id
-                      ? 'Ẩn tiến độ nhóm'
-                      : `Xem tiến độ nhóm · ${task.members.length}`}</button
-                  >{/if}</td
+                      class="team-toggle"
+                      type="button"
+                      aria-expanded={expandedTaskId === task.id}
+                      aria-controls={`team-progress-${task.id}`}
+                      onclick={() =>
+                        (expandedTaskId =
+                          expandedTaskId === task.id ? null : task.id)}
+                      >{expandedTaskId === task.id
+                        ? 'Ẩn tiến độ nhóm'
+                        : `Xem tiến độ nhóm · ${task.members.length}`}</button
+                    >{/if}</td
                 ><td>{labels[task.task_type]}</td><td
                   ><span class="status">{labels[task.status]}</span></td
-                ><td>{task.lead_name ?? '—'}</td
-                ><td class:late={task.overdue}>{task.deadline}</td
-                ><td>{task.assigned_quantity ?? '—'}</td
-                ><td>{task.done_quantity ?? '—'}</td><td
+                ><td>{task.lead_name ?? '—'}</td><td class:late={task.overdue}
+                  >{task.deadline}</td
+                ><td>{task.assigned_quantity ?? '—'}</td><td
+                  >{task.done_quantity ?? '—'}</td
+                ><td
                   >{task.avg_progress === null
                     ? '—'
                     : `${Math.round(task.avg_progress)}%`}</td
                 ><td>{labels[task.eval_result ?? ''] ?? '—'}</td></tr
               >{#if task.task_type === 'TEAM' && expandedTaskId === task.id}<tr
                   class="team-expanded-row"
-                ><td colspan="9">
-                  <section id={`team-progress-${task.id}`} class="team-panel">
-                    <h3>Tiến độ nhóm: {task.title}</h3>
-                    {#if task.members.length === 0}<p class="team-empty">
-                        Chưa có thành viên được phân công.
-                      </p>{:else}<table class="member-table">
-                        <thead><tr><th>Thành viên</th><th>Phần việc</th><th
-                            >Khối lượng giao</th
-                          ><th>Đã thực hiện</th><th>Tiến độ</th></tr></thead
-                        ><tbody>
-                          {#each task.members as member (member.user_id)}<tr>
-                            <td>{member.full_name}</td><td>{member.content}</td
-                            ><td>{member.quantity
-                                ? `${member.quantity}${member.unit ? ` ${member.unit}` : ''}`
-                                : '—'}</td
-                            ><td>{member.done_quantity
-                                ? `${member.done_quantity}${member.unit ? ` ${member.unit}` : ''}`
-                                : '—'}</td
-                            ><td>{member.progress}%</td></tr
-                          >{/each}
-                        </tbody>
-                      </table>{/if}
-                  </section>
-                </td></tr
-              >{/if}{/each}
+                  ><td colspan="9">
+                    <section id={`team-progress-${task.id}`} class="team-panel">
+                      <h3>Tiến độ nhóm: {task.title}</h3>
+                      {#if task.members.length === 0}<p class="team-empty">
+                          Chưa có thành viên được phân công.
+                        </p>{:else}<table class="member-table">
+                          <thead
+                            ><tr
+                              ><th>Thành viên</th><th>Phần việc</th><th
+                                >Khối lượng giao</th
+                              ><th>Đã thực hiện</th><th>Tiến độ</th></tr
+                            ></thead
+                          ><tbody>
+                            {#each task.members as member (member.user_id)}<tr>
+                                <td>{member.full_name}</td><td
+                                  >{member.content}</td
+                                ><td
+                                  >{member.quantity
+                                    ? `${member.quantity}${member.unit ? ` ${member.unit}` : ''}`
+                                    : '—'}</td
+                                ><td
+                                  >{member.done_quantity
+                                    ? `${member.done_quantity}${member.unit ? ` ${member.unit}` : ''}`
+                                    : '—'}</td
+                                ><td>{member.progress}%</td></tr
+                              >{/each}
+                          </tbody>
+                        </table>{/if}
+                    </section>
+                  </td></tr
+                >{/if}{/each}
           </tbody>
         </table>
       </div>
@@ -188,7 +203,11 @@
         <input type="hidden" name="to" value={data.filters.to} />
         <input type="hidden" name="type" value={data.filters.type} />
         <input type="hidden" name="user" value={data.filters.user} />
-        <input type="hidden" name="completion" value={data.filters.completion} />
+        <input
+          type="hidden"
+          name="completion"
+          value={data.filters.completion}
+        />
         <input type="hidden" name="scope" value="people" />
         <button class="download" type="submit" disabled={!data.people.length}
           >Tải thống kê CSV <span aria-hidden="true">↓</span></button

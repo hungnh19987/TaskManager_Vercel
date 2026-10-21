@@ -558,7 +558,12 @@ export const createReportService = (
     actor: AuthUser,
     filters: Pick<
       ReportFilters,
-      'dateFrom' | 'dateTo' | 'statuses' | 'taskType' | 'userId' | 'completionState'
+      | 'dateFrom'
+      | 'dateTo'
+      | 'statuses'
+      | 'taskType'
+      | 'userId'
+      | 'completionState'
     > = {}
   ): Promise<PersonReport[]> => {
     await assertActive(database, actor);

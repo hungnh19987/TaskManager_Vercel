@@ -125,7 +125,8 @@ Migration `202610200003_tasks` da duoc ap dung tren PostgreSQL local. Integratio
 
 ### Security va deploy (Phase 6)
 
-- Build standalone bang `@sveltejs/adapter-node`; chay `npm run build` roi `npm start`. Cau hinh `HOST=0.0.0.0`, `PORT` theo platform; TLS terminate tai reverse proxy/load balancer.
+- Deploy Vercel bang `@sveltejs/adapter-vercel` (duoc chon tu dong khi Vercel dat `VERCEL=1`); dung Node.js 20.9 tro len va cau hinh `DATABASE_URL`, `LOGIN_RATE_LIMIT_SECRET` trong Project Settings > Environment Variables. Chay migration truoc khi gui traffic: `npm run db:migrate`.
+- Chay standalone bang `@sveltejs/adapter-node` khi khong o tren Vercel: `npm run build` roi `npm start`. Cau hinh `HOST=0.0.0.0`, `PORT` theo platform; TLS terminate tai reverse proxy/load balancer.
 - Production env bat buoc `DATABASE_URL`, `LOGIN_RATE_LIMIT_SECRET` (random toi thieu 32 bytes), `NODE_ENV=production`. Khong reuse DB URL lam limiter secret; khong expose bien nao qua `PUBLIC_*`.
 - Login limit dung hai HMAC buckets: username+IP (5 attempts/15 min) va IP aggregate (20 attempts/15 min), block 15 min. Client address phu thuoc `getClientAddress()`; chi tin forwarded headers tu proxy tin cay/allowlisted, khong expose app truc tiep neu proxy IP chua duoc cau hinh.
 - Security headers: CSP nonce mode do SvelteKit tao, `nosniff`, `frame-deny`, referrer/permissions policy; HSTS chi production. Cookie Secure bat trong production.

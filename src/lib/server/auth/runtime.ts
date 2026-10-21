@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+import { building } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { createAuthService } from './service';
 import { passwords } from './passwords';
@@ -11,12 +13,18 @@ export const authService = createAuthService({
   passwords
 });
 
-const rateLimitSecret = env.LOGIN_RATE_LIMIT_SECRET ?? env.DATABASE_URL;
-if (!rateLimitSecret)
-  throw new Error('Server database configuration is required.');
-if (process.env.NODE_ENV === 'production' && !env.LOGIN_RATE_LIMIT_SECRET) {
+if (
+  process.env.NODE_ENV === 'production' &&
+  !building &&
+  !env.LOGIN_RATE_LIMIT_SECRET
+) {
   throw new Error('LOGIN_RATE_LIMIT_SECRET is required in production.');
 }
+const rateLimitSecret = building
+  ? randomBytes(32).toString('hex')
+  : (env.LOGIN_RATE_LIMIT_SECRET ??
+    env.DATABASE_URL ??
+    randomBytes(32).toString('hex'));
 export const loginRateLimiter = createLoginRateLimiter(
   authDatabase,
   rateLimitSecret
