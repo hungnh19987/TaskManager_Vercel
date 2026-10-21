@@ -628,21 +628,37 @@ export const createReportService = (
     const { rows } = await database.query<RawRow>(
       `WITH people AS (
         SELECT id, full_name FROM users WHERE is_active = true AND role IN ('MANAGER', 'STAFF')
-       ), part_stats AS (
-        SELECT m.user_id, count(*)::int AS parts,
-          count(*) FILTER (WHERE m.progress = 100)::int AS completed,
-          avg(m.progress)::float AS avg_progress,
-          count(*) FILTER (WHERE t.status = 'PASSED')::int AS passed,
-          count(*) FILTER (WHERE t.status = 'FAILED')::int AS failed,
-          count(*) FILTER (WHERE t.status = 'IN_PROGRESS' AND m.progress < 100 AND t.deadline < $${todayIndex}::date)::int AS overdue_parts
-        FROM task_members m JOIN tasks t ON t.id = m.task_id
+       ), eligible_tasks AS (
+        SELECT t.* FROM tasks t
         WHERE t.status = ANY($${executedIndex}::text[]) ${dateSql} ${taskFilterSql}
-        GROUP BY m.user_id
+       ), work_items AS (
+        SELECT m.user_id, t.id AS task_id, t.status, t.deadline, m.progress::float AS progress
+        FROM task_members m JOIN eligible_tasks t ON t.id = m.task_id
+        WHERE t.task_type <> 'TEAM' OR m.user_id <> t.lead_id
+        UNION ALL
+        SELECT t.lead_id AS user_id, t.id AS task_id, t.status, t.deadline,
+          CASE
+            WHEN sum(m.quantity) > 0 THEN
+              (coalesce(sum(m.done_quantity) FILTER (WHERE m.quantity IS NOT NULL), 0)
+                / sum(m.quantity)) * 100
+            ELSE avg(m.progress)::numeric
+          END::float AS progress
+        FROM eligible_tasks t LEFT JOIN task_members m ON m.task_id = t.id
+        WHERE t.task_type = 'TEAM' AND t.lead_id IS NOT NULL
+        GROUP BY t.id, t.lead_id, t.status, t.deadline
+       ), part_stats AS (
+        SELECT user_id, count(*)::int AS parts,
+          count(*) FILTER (WHERE progress = 100)::int AS completed,
+          avg(progress)::float AS avg_progress,
+          count(*) FILTER (WHERE status = 'PASSED')::int AS passed,
+          count(*) FILTER (WHERE status = 'FAILED')::int AS failed,
+          count(*) FILTER (WHERE status = 'IN_PROGRESS' AND progress < 100 AND deadline < $${todayIndex}::date)::int AS overdue_parts
+        FROM work_items GROUP BY user_id
        ), lead_stats AS (
         SELECT t.lead_id, count(*)::int AS led_total,
           count(*) FILTER (WHERE t.status = 'PASSED')::int AS led_passed,
           count(*) FILTER (WHERE t.status = 'FAILED')::int AS led_failed
-        FROM tasks t WHERE t.lead_id IS NOT NULL AND t.status = ANY($${executedIndex}::text[]) ${dateSql} ${taskFilterSql}
+        FROM eligible_tasks t WHERE t.lead_id IS NOT NULL
         GROUP BY t.lead_id
        )
        SELECT p.id AS user_id, p.full_name, coalesce(ps.parts, 0)::int AS parts,

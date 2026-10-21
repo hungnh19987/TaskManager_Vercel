@@ -243,6 +243,96 @@ test('report filters compose by deadline, status, type, and involved user; perso
   }
 });
 
+test('TEAM lead is counted once for the whole task using the members average progress', async () => {
+  const fixture = await createFixture();
+  try {
+    const taskId = await createTeam(fixture, {
+      title: 'Lead also has an individual assignment',
+      deadline: '2026-10-25',
+      memberIds: [fixture.staff.id, fixture.staffTwo.id]
+    });
+    await fixture.db.query(
+      "UPDATE tasks SET status = 'IN_PROGRESS' WHERE id = $1",
+      [taskId]
+    );
+    await fixture.db.query(
+      'UPDATE task_members SET progress = $3, result_report = $4 WHERE task_id = $1 AND user_id = $2',
+      [taskId, fixture.staff.id, 100, 'Lead assignment complete']
+    );
+    await fixture.db.query(
+      'UPDATE task_members SET progress = $3 WHERE task_id = $1 AND user_id = $2',
+      [taskId, fixture.staffTwo.id, 40]
+    );
+
+    const people = await fixture.reports.peopleReport(fixture.manager, {
+      dateFrom: '2026-10-20',
+      dateTo: '2026-10-31'
+    });
+    const lead = people.find((person) => person.user_id === fixture.staff.id);
+    assert.ok(lead);
+    assert.equal(lead?.parts, 1);
+    assert.equal(lead?.completed, 0);
+    assert.equal(lead?.avg_progress, 70);
+    assert.equal(lead?.led_total, 1);
+
+    const member = people.find(
+      (person) => person.user_id === fixture.staffTwo.id
+    );
+    assert.equal(member?.parts, 1);
+    assert.equal(member?.avg_progress, 40);
+  } finally {
+    await fixture.db.close();
+  }
+});
+
+test('TEAM lead progress is weighted by total completed quantity over total assigned quantity', async () => {
+  const fixture = await createFixture();
+  try {
+    const taskId = await fixture.tasks.createTask(fixture.staff, {
+      taskType: 'TEAM',
+      title: 'Weighted team progress',
+      deadline: '2026-10-25',
+      leadId: fixture.staff.id,
+      members: [
+        {
+          userId: fixture.staff.id,
+          content: 'Complete large share',
+          quantity: 90,
+          unit: 'items'
+        },
+        {
+          userId: fixture.staffTwo.id,
+          content: 'Complete small share',
+          quantity: 10,
+          unit: 'items'
+        }
+      ]
+    });
+    await fixture.db.query(
+      "UPDATE tasks SET status = 'IN_PROGRESS' WHERE id = $1",
+      [taskId]
+    );
+    await fixture.db.query(
+      'UPDATE task_members SET done_quantity = 45, progress = 50 WHERE task_id = $1 AND user_id = $2',
+      [taskId, fixture.staff.id]
+    );
+    await fixture.db.query(
+      "UPDATE task_members SET done_quantity = 10, progress = 100, result_report = 'Complete' WHERE task_id = $1 AND user_id = $2",
+      [taskId, fixture.staffTwo.id]
+    );
+
+    const people = await fixture.reports.peopleReport(fixture.manager, {
+      dateFrom: '2026-10-20',
+      dateTo: '2026-10-31'
+    });
+    const lead = people.find((person) => person.user_id === fixture.staff.id);
+    assert.equal(lead?.parts, 1);
+    assert.equal(lead?.avg_progress, 55);
+  } finally {
+    await fixture.db.close();
+  }
+});
+
 test('report validates date/type/status input and authorization', async () => {
   const fixture = await createFixture();
   try {
