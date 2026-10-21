@@ -1,5 +1,6 @@
 <script lang="ts">
   let { data } = $props();
+  let expandedTaskId = $state<string | null>(null);
   const types = [
     ['TEAM', 'Nhóm'],
     ['DIRECT', 'Giao trực tiếp'],
@@ -121,8 +122,33 @@
           ><tbody>
             {#each data.tasks as task (task.id)}<tr
                 ><td class="title"><a href={`/tasks/${task.id}`}>{task.title}</a
-                  >{#if task.task_type === 'TEAM'}<details class="team-detail">
-                    <summary>Xem tiến độ nhóm · {task.members.length}</summary>
+                  >{#if task.task_type === 'TEAM'}<button
+                    class="team-toggle"
+                    type="button"
+                    aria-expanded={expandedTaskId === task.id}
+                    aria-controls={`team-progress-${task.id}`}
+                    onclick={() =>
+                      (expandedTaskId =
+                        expandedTaskId === task.id ? null : task.id)}
+                    >{expandedTaskId === task.id
+                      ? 'Ẩn tiến độ nhóm'
+                      : `Xem tiến độ nhóm · ${task.members.length}`}</button
+                  >{/if}</td
+                ><td>{labels[task.task_type]}</td><td
+                  ><span class="status">{labels[task.status]}</span></td
+                ><td>{task.lead_name ?? '—'}</td
+                ><td class:late={task.overdue}>{task.deadline}</td
+                ><td>{task.assigned_quantity ?? '—'}</td
+                ><td>{task.done_quantity ?? '—'}</td><td
+                  >{task.avg_progress === null
+                    ? '—'
+                    : `${Math.round(task.avg_progress)}%`}</td
+                ><td>{labels[task.eval_result ?? ''] ?? '—'}</td></tr
+              >{#if task.task_type === 'TEAM' && expandedTaskId === task.id}<tr
+                  class="team-expanded-row"
+                ><td colspan="9">
+                  <section id={`team-progress-${task.id}`} class="team-panel">
+                    <h3>Tiến độ nhóm: {task.title}</h3>
                     {#if task.members.length === 0}<p class="team-empty">
                         Chưa có thành viên được phân công.
                       </p>{:else}<table class="member-table">
@@ -142,18 +168,9 @@
                           >{/each}
                         </tbody>
                       </table>{/if}
-                  </details>{/if}</td
-                ><td>{labels[task.task_type]}</td><td
-                  ><span class="status">{labels[task.status]}</span></td
-                ><td>{task.lead_name ?? '—'}</td
-                ><td class:late={task.overdue}>{task.deadline}</td
-                ><td>{task.assigned_quantity ?? '—'}</td
-                ><td>{task.done_quantity ?? '—'}</td><td
-                  >{task.avg_progress === null
-                    ? '—'
-                    : `${Math.round(task.avg_progress)}%`}</td
-                ><td>{labels[task.eval_result ?? ''] ?? '—'}</td></tr
-              >{/each}
+                  </section>
+                </td></tr
+              >{/if}{/each}
           </tbody>
         </table>
       </div>
@@ -371,26 +388,38 @@
     max-width: 320px;
     color: #2b3930;
   }
-  .team-detail {
+  .team-toggle {
     margin-top: 7px;
+    display: block;
+    border: 0;
+    background: transparent;
+    padding: 0;
     color: #53634d;
-    font-size: 10px;
-    white-space: normal;
-  }
-  .team-detail summary {
-    width: fit-content;
-    color: #58733e;
     cursor: pointer;
+    font: inherit;
+    font-size: 10px;
     font-weight: 600;
   }
-  .team-detail[open] {
-    min-width: 600px;
+  .team-toggle:hover {
+    color: #304b32;
+    text-decoration: underline;
+  }
+  .team-expanded-row > td {
+    background: #f5f7f1;
+    padding: 14px 18px;
   }
   .member-table {
-    margin-top: 8px;
+    margin-top: 10px;
     border: 1px solid #dce1d8;
     background: #fff;
     white-space: normal;
+    table-layout: fixed;
+  }
+  .team-panel h3 {
+    margin: 0;
+    color: #2b3930;
+    font-size: 12px;
+    font-weight: 600;
   }
   .member-table th {
     padding: 7px;
